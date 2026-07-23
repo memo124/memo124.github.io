@@ -13,9 +13,15 @@
   const contactForm = document.getElementById("contactForm");
   const yearEl = document.getElementById("year");
   const statsProjects = document.getElementById("statsProjects");
+  const statsTech = document.getElementById("statsTech");
+  const statsExperience = document.getElementById("statsExperience");
+  const skillsTags = document.getElementById("skillsTags");
 
   let allProjects = [];
   let currentFilter = "featured";
+  let statsAnimated = false;
+
+  const CACHE_KEY = `portfolio_github_v2_${CONFIG.githubUsername}`;
 
   /* ── Navigation ── */
   function closeMenu() {
@@ -56,7 +62,6 @@
   );
   sections.forEach((sec) => observerNav.observe(sec));
 
-  /* ── Scroll reveal ── */
   const observerReveal = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
@@ -80,34 +85,27 @@
     if (!contactInfo || !CONFIG.contact) return;
 
     const c = CONFIG.contact;
+    const lang = I18N.getLang();
+    const labels = I18N.translations[lang].contact.labels;
+    const cfg = I18N.translations[lang].config;
     const items = [];
 
     if (c.fullName) {
-      items.push({
-        icon: "user",
-        label: "Nombre",
-        text: c.fullName,
-        href: null,
-      });
+      items.push({ icon: "user", label: labels.name, text: c.fullName, href: null });
     }
-    if (c.title) {
-      items.push({ icon: "briefcase", label: "Rol", text: c.title, href: null });
+    if (cfg.title) {
+      items.push({ icon: "briefcase", label: labels.role, text: cfg.title, href: null });
     }
     if (c.location) {
-      items.push({ icon: "location", label: "Ubicación", text: c.location, href: null });
+      items.push({ icon: "location", label: labels.location, text: c.location, href: null });
     }
     if (c.email) {
-      items.push({
-        icon: "email",
-        label: "Email",
-        text: c.email,
-        href: `mailto:${c.email}`,
-      });
+      items.push({ icon: "email", label: labels.email, text: c.email, href: `mailto:${c.email}` });
     }
     if (c.phone) {
       items.push({
         icon: "phone",
-        label: "Teléfono",
+        label: labels.phone,
         text: c.phone,
         href: `tel:${c.phone.replace(/\s/g, "")}`,
       });
@@ -115,8 +113,8 @@
     if (c.whatsapp) {
       items.push({
         icon: "whatsapp",
-        label: "WhatsApp",
-        text: "Enviar mensaje",
+        label: labels.whatsapp,
+        text: labels.whatsappAction,
         href: `https://wa.me/${c.whatsapp}`,
         external: true,
       });
@@ -124,7 +122,7 @@
     if (c.linkedin) {
       items.push({
         icon: "linkedin",
-        label: "LinkedIn",
+        label: labels.linkedin,
         text: "linkedin.com/in/guillermo-minero",
         href: c.linkedin,
         external: true,
@@ -133,7 +131,7 @@
     if (c.github) {
       items.push({
         icon: "github",
-        label: "GitHub",
+        label: labels.github,
         text: "github.com/memo124",
         href: c.github,
         external: true,
@@ -171,59 +169,124 @@
       })
       .join("");
 
-    if (c.availability) {
+    if (cfg.availability) {
       contactInfo.insertAdjacentHTML(
         "beforeend",
-        `<p class="contact__availability">${c.availability}</p>`
+        `<p class="contact__availability">${cfg.availability}</p>`
       );
     }
   }
 
-  /* ── GitHub API ── */
-  async function fetchGitHubProjects() {
-    const username = CONFIG.githubUsername;
-    const url = `https://api.github.com/users/${username}/repos?per_page=100&sort=updated`;
+  /* ── GitHub API con caché ── */
+  function readCache() {
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (!raw) return null;
+      const { timestamp, projects } = JSON.parse(raw);
+      if (Date.now() - timestamp > CONFIG.cacheTtlMs) return null;
+      return projects;
+    } catch {
+      return null;
+    }
+  }
 
+  function writeCache(projects) {
+    try {
+      localStorage.setItem(
+        CACHE_KEY,
+        JSON.stringify({ timestamp: Date.now(), projects })
+      );
+    } catch {
+      /* quota exceeded — ignore */
+    }
+  }
+
+  async function fetchRepoLanguages(username, repoName) {
+    const res = await fetch(
+      `https://api.github.com/repos/${username}/${repoName}/languages`
+    );
+    return res.ok ? res.json() : {};
+  }
+
+  async function enrichRepo(repo) {
+    const username = CONFIG.githubUsername;
+    const [languages, manifestTags] = await Promise.all([
+      fetchRepoLanguages(username, repo.name),
+      fetchRepoManifestTech(username, repo.name),
+    ]);
+    return buildProjectFromRepo(repo, languages, [...manifestTags]);
+  }
+
+  async function fetchGitHubProjects() {
+    const cached = readCache();
+    if (cached) return cached;
+
+    const url = `https://api.github.com/users/${CONFIG.githubUsername}/repos?per_page=100&sort=updated`;
     const response = await fetch(url);
     if (!response.ok) throw new Error(`GitHub API: ${response.status}`);
 
     const repos = await response.json();
-    return repos
+    const filtered = repos
       .filter((repo) => !CONFIG.excludedRepos.includes(repo.name))
-      .filter((repo) => !CONFIG.excludeForks || !repo.fork)
-      .map(buildProjectFromRepo)
-      .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+      .filter((repo) => !CONFIG.excludeForks || !repo.fork);
+
+    const batchSize = 5;
+    const projects = [];
+
+    for (let i = 0; i < filtered.length; i += batchSize) {
+      const batch = filtered.slice(i, i + batchSize);
+      const enriched = await Promise.all(batch.map(enrichRepo));
+      projects.push(...enriched);
+    }
+
+    projects.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+    writeCache(projects);
+    return projects;
   }
 
-  /* ── Projects UI ── */
-  function createProjectCard(project) {
-    const color = LANGUAGE_COLORS[project.language] || LANGUAGE_COLORS.Other;
-    const card = document.createElement("article");
-    card.className = `project-card reveal${project.featured ? " project-card--featured" : ""}`;
-    card.dataset.category = project.category;
+  function collectUniqueTechnologies(projects) {
+    const techs = new Set();
+    projects.forEach((p) => p.tags.forEach((t) => techs.add(t)));
+    const locale = I18N.getLang() === "en" ? "en" : "es";
+    return [...techs].sort((a, b) => a.localeCompare(b, locale));
+  }
 
-    const tagsHtml = project.tags
+  function renderSkillsTags(technologies) {
+    if (!skillsTags) return;
+    skillsTags.innerHTML = technologies
+      .map((tech) => `<span class="skill-tag">${tech}</span>`)
+      .join("");
+  }
+
+  function createProjectCard(project) {
+    const p = localizeProject(project, I18N.getLang());
+    const color = LANGUAGE_COLORS[p.language] || LANGUAGE_COLORS.Other;
+    const card = document.createElement("article");
+    card.className = `project-card reveal${p.featured ? " project-card--featured" : ""}`;
+    card.dataset.category = p.category;
+
+    const tagsHtml = p.tags
       .map((tag) => `<span class="project-card__tag">${tag}</span>`)
       .join("");
 
-    const demoBtn = project.demo
-      ? `<a href="${project.demo}" class="btn btn--ghost btn--sm" target="_blank" rel="noopener noreferrer">Demo</a>`
+    const demoBtn = p.demo
+      ? `<a href="${p.demo}" class="btn btn--ghost btn--sm" target="_blank" rel="noopener noreferrer">${I18N.t("projects.demo")}</a>`
       : "";
 
     card.innerHTML = `
       <div class="project-card__header" style="--lang-color: ${color}">
-        <span class="project-card__lang">${project.language}</span>
-        ${project.featured ? '<span class="project-card__badge">Destacado</span>' : ""}
+        <span class="project-card__lang">${p.language}</span>
+        ${p.featured ? `<span class="project-card__badge">${I18N.t("projects.featured")}</span>` : ""}
       </div>
       <div class="project-card__body">
-        <h3 class="project-card__title">${project.name}</h3>
-        <p class="project-card__desc">${project.description}</p>
+        <h3 class="project-card__title">${p.name}</h3>
+        <p class="project-card__desc">${p.description}</p>
         <div class="project-card__tags">${tagsHtml}</div>
       </div>
       <div class="project-card__footer">
-        <a href="${project.github}" class="btn btn--primary btn--sm" target="_blank" rel="noopener noreferrer">
+        <a href="${p.github}" class="btn btn--primary btn--sm" target="_blank" rel="noopener noreferrer">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.395-.135-.345-.72-1.395-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-          GitHub
+          ${I18N.t("projects.github")}
         </a>
         ${demoBtn}
       </div>
@@ -244,8 +307,7 @@
         : allProjects.filter((p) => p.category === filter);
 
     if (filtered.length === 0) {
-      projectsGrid.innerHTML =
-        '<p class="projects__empty">No hay proyectos en esta categoría.</p>';
+      projectsGrid.innerHTML = `<p class="projects__empty">${I18N.t("projects.empty")}</p>`;
       return;
     }
 
@@ -265,30 +327,54 @@
     });
   });
 
+  function updateStatsValues(projectCount, techCount) {
+    const expYears = getExperienceYears();
+
+    if (statsProjects) statsProjects.dataset.count = projectCount;
+    if (statsTech) statsTech.dataset.count = techCount;
+    if (statsExperience) statsExperience.dataset.count = expYears;
+
+    if (statsAnimated) {
+      if (statsProjects) statsProjects.textContent = projectCount;
+      if (statsTech) statsTech.textContent = techCount;
+      if (statsExperience) statsExperience.textContent = expYears;
+    }
+  }
+
+  function updateProjectsStatus() {
+    if (projectsStatus && allProjects.length) {
+      projectsStatus.textContent = I18N.translations[I18N.getLang()].projects.syncStatus(
+        allProjects.length
+      );
+    }
+  }
+
   async function loadProjects() {
     try {
       allProjects = await fetchGitHubProjects();
+      const technologies = collectUniqueTechnologies(allProjects);
 
       if (projectsLoading) projectsLoading.hidden = true;
-      if (projectsStatus) {
-        projectsStatus.textContent = `${allProjects.length} repos sincronizados desde GitHub`;
-      }
-      if (statsProjects) {
-        statsProjects.dataset.count = allProjects.length;
-      }
+      updateProjectsStatus();
 
+      updateStatsValues(allProjects.length, technologies.length);
+      renderSkillsTags(technologies);
       renderProjects(currentFilter);
+      runStatsAnimationIfVisible();
     } catch (err) {
       console.error(err);
       if (projectsLoading) {
-        projectsLoading.innerHTML =
-          '<p class="projects__error">No se pudieron cargar los proyectos. Intenta recargar la página.</p>';
+        projectsLoading.innerHTML = `<p class="projects__error">${I18N.t("projects.error")}</p>`;
       }
     }
   }
 
   /* ── Stats counter ── */
   function animateCounter(el, target) {
+    if (!el || target <= 0) {
+      if (el) el.textContent = target;
+      return;
+    }
     let current = 0;
     const step = Math.max(1, Math.ceil(target / 40));
     const timer = setInterval(() => {
@@ -302,18 +388,33 @@
     }, 30);
   }
 
+  function runStatsAnimation() {
+    if (statsAnimated) return;
+    statsAnimated = true;
+
+    document.querySelectorAll("[data-count]").forEach((el) => {
+      animateCounter(el, parseInt(el.dataset.count, 10) || 0);
+    });
+  }
+
+  function runStatsAnimationIfVisible() {
+    const statsSection = document.querySelector(".stats");
+    if (!statsSection) return;
+    const rect = statsSection.getBoundingClientRect();
+    const visible = rect.top < window.innerHeight && rect.bottom > 0;
+    if (visible) runStatsAnimation();
+  }
+
   const statsObserver = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          document.querySelectorAll("[data-count]").forEach((el) => {
-            animateCounter(el, parseInt(el.dataset.count, 10));
-          });
+        if (entry.isIntersecting && allProjects.length > 0) {
+          runStatsAnimation();
           statsObserver.disconnect();
         }
       });
     },
-    { threshold: 0.5 }
+    { threshold: 0.3 }
   );
 
   const statsSection = document.querySelector(".stats");
@@ -326,16 +427,16 @@
       const name = document.getElementById("name").value.trim();
       const email = document.getElementById("email").value.trim();
       const message = document.getElementById("message").value.trim();
-      const subject = encodeURIComponent(`Contacto portafolio - ${name}`);
-      const body = encodeURIComponent(
-        `Nombre: ${name}\nEmail: ${email}\n\n${message}`
-      );
 
       if (CONFIG.contact.email) {
+        const subject = encodeURIComponent(I18N.translations[I18N.getLang()].contact.subject(name));
+        const body = encodeURIComponent(
+          `Nombre: ${name}\nEmail: ${email}\n\n${message}`
+        );
         window.location.href = `mailto:${CONFIG.contact.email}?subject=${subject}&body=${body}`;
       } else if (CONFIG.contact.whatsapp) {
         const waText = encodeURIComponent(
-          `Hola Guillermo, soy ${name} (${email}). ${message}`
+          I18N.translations[I18N.getLang()].contact.whatsappIntro(name, email, message)
         );
         window.open(
           `https://wa.me/${CONFIG.contact.whatsapp}?text=${waText}`,
@@ -351,6 +452,18 @@
   }
 
   if (yearEl) yearEl.textContent = new Date().getFullYear();
+
+  if (statsExperience) {
+    statsExperience.dataset.count = getExperienceYears();
+  }
+
+  I18N.init();
+
+  window.addEventListener("languagechange", () => {
+    renderContactInfo();
+    updateProjectsStatus();
+    if (allProjects.length) renderProjects(currentFilter);
+  });
 
   renderContactInfo();
   loadProjects();

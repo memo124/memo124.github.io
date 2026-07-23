@@ -3,22 +3,22 @@
  */
 const CONFIG = {
   githubUsername: "memo124",
+  careerStartYear: 2022,
 
-  /** Repositorios que NO deben aparecer en el portafolio */
   excludedRepos: ["memo124.github.io"],
-
-  /** Ocultar repos que son forks de otros usuarios */
   excludeForks: true,
+
+  /** TTL del caché de GitHub en localStorage (1 hora) */
+  cacheTtlMs: 60 * 60 * 1000,
 
   contact: {
     fullName: "Guillermo Andrés Minero Alfaro",
     title: "Desarrollador Full Stack",
     location: "San Salvador, El Salvador",
-    email: "", // Ejemplo: "tu.correo@gmail.com"
-    phone: "", // Ejemplo: "+503 0000-0000"
-    whatsapp: "", // Ejemplo: "50300000000" (sin + ni espacios)
+    email: "",
+    phone: "",
+    whatsapp: "",
     linkedin: "https://www.linkedin.com/in/guillermo-minero",
     github: "https://github.com/memo124",
-    availability: "Disponible para proyectos freelance, colaboraciones y oportunidades laborales.",
   },
 };
