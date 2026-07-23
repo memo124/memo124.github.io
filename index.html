@@ -150,30 +150,13 @@
           <span class="section__tag" data-i18n="skills.tag">Stack tecnológico</span>
           <h2 class="section__title" data-i18n="skills.title">Mis habilidades</h2>
         </div>
-        <div class="skills__grid">
-          <div class="skill-card reveal">
-            <div class="skill-card__icon skill-card__icon--html">HTML5</div>
-            <h3 data-i18n="skills.frontend">Frontend</h3>
-            <p data-i18n="skills.frontendDesc">HTML, CSS, JavaScript, TypeScript, Angular, SASS</p>
+        <div class="skills-stack reveal" id="skillsStack"></div>
+
+        <div class="skills__github reveal">
+          <h3 class="skills__github-title" data-i18n="skills.githubTitle">Also in my GitHub projects</h3>
+          <div class="skills__tags" id="skillsTags">
+            <span class="skills__tags-loading" data-i18n="skills.loading">Detectando tecnologías desde GitHub…</span>
           </div>
-          <div class="skill-card reveal">
-            <div class="skill-card__icon skill-card__icon--php">PHP</div>
-            <h3 data-i18n="skills.backend">Backend</h3>
-            <p data-i18n="skills.backendDesc">PHP, Laravel, Python, FastAPI, PostgreSQL, MySQL, REST APIs</p>
-          </div>
-          <div class="skill-card reveal">
-            <div class="skill-card__icon skill-card__icon--csharp">C#</div>
-            <h3 data-i18n="skills.desktop">Desktop & .NET</h3>
-            <p data-i18n="skills.desktopDesc">C#, .NET, WPF, Windows Forms, ASP.NET, SQL Server</p>
-          </div>
-          <div class="skill-card reveal">
-            <div class="skill-card__icon skill-card__icon--git">Git</div>
-            <h3 data-i18n="skills.tools">Herramientas</h3>
-            <p data-i18n="skills.toolsDesc">Git, GitHub, Bootstrap, SASS, REST APIs, Netlify</p>
-          </div>
-        </div>
-        <div class="skills__tags reveal" id="skillsTags">
-          <span class="skills__tags-loading" data-i18n="skills.loading">Detectando tecnologías desde GitHub…</span>
         </div>
       </div>
     </section>
@@ -256,6 +239,7 @@
 
     <script src="js/config.js"></script>
     <script src="js/i18n.js"></script>
+    <script src="js/skills.js"></script>
     <script src="js/projects.js"></script>
     <script src="js/main.js"></script>
   </body>

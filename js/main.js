@@ -16,6 +16,7 @@
   const statsTech = document.getElementById("statsTech");
   const statsExperience = document.getElementById("statsExperience");
   const skillsTags = document.getElementById("skillsTags");
+  const skillsStack = document.getElementById("skillsStack");
 
   let allProjects = [];
   let currentFilter = "featured";
@@ -244,16 +245,57 @@
     return projects;
   }
 
-  function collectUniqueTechnologies(projects) {
+  function getGithubTechnologies(projects) {
     const techs = new Set();
     projects.forEach((p) => p.tags.forEach((t) => techs.add(t)));
     const locale = I18N.getLang() === "en" ? "en" : "es";
     return [...techs].sort((a, b) => a.localeCompare(b, locale));
   }
 
-  function renderSkillsTags(technologies) {
+  function collectUniqueTechnologies(projects) {
+    const techs = new Set(getAllCvTechNames());
+    projects.forEach((p) => p.tags.forEach((t) => techs.add(t)));
+    const locale = I18N.getLang() === "en" ? "en" : "es";
+    return [...techs].sort((a, b) => a.localeCompare(b, locale));
+  }
+
+  function renderSkillsStack() {
+    if (!skillsStack) return;
+
+    const lang = I18N.getLang();
+    const categories = I18N.translations[lang].skills.categories;
+
+    skillsStack.innerHTML = TECH_STACK.map(
+      (category) => `
+      <section class="skills-category">
+        <h3 class="skills-category__title">${categories[category.id]}</h3>
+        <div class="skills-category__grid">
+          ${category.items
+            .map(
+              (item) => `
+            <article class="skill-item">
+              <h4 class="skill-item__name">${item.name}</h4>
+              <p class="skill-item__desc">${item.desc[lang]}</p>
+            </article>
+          `
+            )
+            .join("")}
+        </div>
+      </section>
+    `
+    ).join("");
+  }
+
+  function renderSkillsTags(projects) {
     if (!skillsTags) return;
-    skillsTags.innerHTML = technologies
+    const githubTags = getGithubTechnologies(projects);
+
+    if (githubTags.length === 0) {
+      skillsTags.innerHTML = `<span class="skills__tags-loading">${I18N.t("skills.loading")}</span>`;
+      return;
+    }
+
+    skillsTags.innerHTML = githubTags
       .map((tech) => `<span class="skill-tag">${tech}</span>`)
       .join("");
   }
@@ -358,7 +400,7 @@
       updateProjectsStatus();
 
       updateStatsValues(allProjects.length, technologies.length);
-      renderSkillsTags(technologies);
+      renderSkillsTags(allProjects);
       renderProjects(currentFilter);
       runStatsAnimationIfVisible();
     } catch (err) {
@@ -461,10 +503,21 @@
 
   window.addEventListener("languagechange", () => {
     renderContactInfo();
+    renderSkillsStack();
     updateProjectsStatus();
-    if (allProjects.length) renderProjects(currentFilter);
+    if (allProjects.length) {
+      const technologies = collectUniqueTechnologies(allProjects);
+      updateStatsValues(allProjects.length, technologies.length);
+      renderSkillsTags(allProjects);
+      renderProjects(currentFilter);
+    }
   });
 
+  if (statsTech) {
+    statsTech.dataset.count = getCvTechCount();
+  }
+
   renderContactInfo();
+  renderSkillsStack();
   loadProjects();
 })();

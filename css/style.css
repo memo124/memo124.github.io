@@ -591,50 +591,72 @@ textarea {
 }
 
 /* ── Skills ── */
-.skills__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 2.5rem;
+/* ── Skills stack (CV) ── */
+.skills-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+  margin-bottom: 3rem;
 }
 
-.skill-card {
+.skills-category__title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 2px solid var(--border);
+  color: var(--accent-light);
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+.skills-category__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.skill-item {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1.75rem;
+  padding: 1.1rem 1.25rem;
   transition: var(--transition);
 }
 
-.skill-card:hover {
+.skill-item:hover {
   border-color: rgba(6, 182, 212, 0.3);
-  transform: translateY(-4px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
 }
 
-.skill-card__icon {
-  display: inline-block;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.35rem 0.75rem;
-  border-radius: 6px;
-  margin-bottom: 1rem;
+.skill-item__name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 0.45rem;
+  color: var(--text);
 }
 
-.skill-card__icon--html { background: rgba(227, 79, 38, 0.15); color: #E34F26; }
-.skill-card__icon--php { background: rgba(119, 123, 180, 0.15); color: #777BB4; }
-.skill-card__icon--csharp { background: rgba(35, 145, 32, 0.15); color: #239120; }
-.skill-card__icon--git { background: rgba(240, 80, 50, 0.15); color: #F05032; }
-
-.skill-card h3 {
-  font-size: 1.1rem;
-  margin-bottom: 0.5rem;
-}
-
-.skill-card p {
+.skill-item__desc {
+  font-size: 0.82rem;
   color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.skills__github {
+  margin-top: 1rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border);
+}
+
+.skills__github-title {
   font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+  margin-bottom: 1.25rem;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .skills__tags {
@@ -642,6 +664,10 @@ textarea {
   flex-wrap: wrap;
   gap: 0.6rem;
   justify-content: center;
+}
+
+.skills__tags-note {
+  display: contents;
 }
 
 .skill-tag {
